@@ -51,5 +51,9 @@ logs/
 # Playwright MCP artifacts
 .playwright-mcp/
 
+# Playwright / browser test screenshot outputs.
+# These land in the repo root; committed images live under docs/ (still tracked).
+/*.png
+
 # Environment variables
 .env

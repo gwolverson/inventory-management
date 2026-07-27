@@ -65,23 +65,28 @@ class TestDemandEndpoints:
                 assert percent_change < 2.0, \
                     f"Item {item['item_name']} has {percent_change:.2f}% change, expected < 2%"
 
-    def test_demand_forecast_has_new_items(self, client):
-        """Test that new demand forecast items exist."""
-        response = client.get("/api/demand")
-        data = response.json()
+    def test_demand_forecast_references_real_inventory_skus(self, client):
+        """Test that every demand forecast item_sku matches a real inventory SKU."""
+        demand_response = client.get("/api/demand")
+        demand_data = demand_response.json()
 
-        # Check for the new items we added
-        skus = [item["item_sku"] for item in data]
+        inventory_response = client.get("/api/inventory")
+        inventory_skus = {item["sku"] for item in inventory_response.json()}
 
-        # Should have Temperature Sensor Module and Logic Controller Board
-        assert "SNR-420" in skus, "Missing Temperature Sensor Module"
-        assert "CTL-330" in skus, "Missing Logic Controller Board"
+        for forecast in demand_data:
+            assert forecast["item_sku"] in inventory_skus, \
+                f"Demand forecast SKU {forecast['item_sku']} has no matching inventory item"
 
-        # Verify they are marked as stable
-        for item in data:
-            if item["item_sku"] in ["SNR-420", "CTL-330"]:
-                assert item["trend"].lower() == "stable", \
-                    f"New item {item['item_name']} should have stable trend"
+        # Spot-check specific known items and their trends
+        skus = [item["item_sku"] for item in demand_data]
+        assert "TMP-201" in skus, "Missing Temperature Sensor Module"
+        assert "PSU-501" in skus, "Missing 5V 10A Switching Power Supply"
+
+        for item in demand_data:
+            if item["item_sku"] == "TMP-201":
+                assert item["trend"].lower() == "increasing"
+            if item["item_sku"] == "PSU-501":
+                assert item["trend"].lower() == "stable"
 
 
 class TestBacklogEndpoints:
