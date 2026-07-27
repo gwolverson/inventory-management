@@ -35,5 +35,13 @@ recent_transactions = load_json_file('transactions.json')
 # Load purchase orders
 purchase_orders = load_json_file('purchase_orders.json')
 
+# Submitted restocking orders (created at runtime, not loaded from a file)
+restock_orders = []
+
+# User tasks (created at runtime, not loaded from a file). The frontend seeds a
+# few mock tasks with numeric ids; these API-backed tasks use string ids so the
+# two sets never collide.
+tasks = []
+
 # All data is now loaded from JSON files in the data/ directory
 # This allows for easier maintenance and updates of the sample data
