@@ -136,7 +136,7 @@ export default {
   },
   emits: ['close', 'add-task', 'delete-task', 'toggle-task'],
   setup(props, { emit }) {
-    const { t, currentLocale } = useI18n()
+    const { t, currentLocale, translatePriority } = useI18n()
     const newTask = ref({
       title: '',
       priority: 'medium',
@@ -218,15 +218,6 @@ export default {
       if (statusClass === 'overdue') return isJapanese ? '期限超過' : 'Overdue'
       if (statusClass === 'urgent') return isJapanese ? 'もうすぐ期限' : 'Due Soon'
       return isJapanese ? '予定' : 'Upcoming'
-    }
-
-    const translatePriority = (priority) => {
-      const priorityMap = {
-        'high': t('priority.high'),
-        'medium': t('priority.medium'),
-        'low': t('priority.low')
-      }
-      return priorityMap[priority] || priority
     }
 
     return {

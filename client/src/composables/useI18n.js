@@ -114,6 +114,69 @@ export function useI18n() {
     return warehouseName
   }
 
+  // Translate product/spending categories
+  const translateCategory = (category) => {
+    // First try spending categories
+    const spendingCategoryMap = {
+      'Raw Materials': t('spendingCategories.rawMaterials'),
+      'Components': t('spendingCategories.components'),
+      'Equipment': t('spendingCategories.equipment'),
+      'Consumables': t('spendingCategories.consumables')
+    }
+
+    // Then try product categories
+    const productCategoryMap = {
+      'Circuit Boards': t('categories.circuitBoards'),
+      'Sensors': t('categories.sensors'),
+      'Actuators': t('categories.actuators'),
+      'Controllers': t('categories.controllers'),
+      'Power Supplies': t('categories.powerSupplies')
+    }
+
+    return spendingCategoryMap[category] || productCategoryMap[category] || category
+  }
+
+  // Translate month abbreviations (Jan..Dec)
+  const translateMonth = (month) => {
+    const monthMap = {
+      'Jan': t('months.jan'),
+      'Feb': t('months.feb'),
+      'Mar': t('months.mar'),
+      'Apr': t('months.apr'),
+      'May': t('months.may'),
+      'Jun': t('months.jun'),
+      'Jul': t('months.jul'),
+      'Aug': t('months.aug'),
+      'Sep': t('months.sep'),
+      'Oct': t('months.oct'),
+      'Nov': t('months.nov'),
+      'Dec': t('months.dec')
+    }
+    return monthMap[month] || month
+  }
+
+  // Translate priority (accepts lower or capitalized case)
+  const translatePriority = (priority) => {
+    const priorityMap = {
+      'high': t('priority.high'),
+      'medium': t('priority.medium'),
+      'low': t('priority.low'),
+      'High': t('priority.high'),
+      'Medium': t('priority.medium'),
+      'Low': t('priority.low')
+    }
+    return priorityMap[priority] || priority
+  }
+
+  // Translate stock level labels
+  const translateStockLevel = (stockLevel) => {
+    const stockMap = {
+      'In Stock': t('status.inStock'),
+      'Low Stock': t('status.lowStock')
+    }
+    return stockMap[stockLevel] || stockLevel
+  }
+
   return {
     t,
     setLocale,
@@ -123,6 +186,10 @@ export function useI18n() {
     localeName,
     translateProductName,
     translateCustomerName,
-    translateWarehouse
+    translateWarehouse,
+    translateCategory,
+    translateMonth,
+    translatePriority,
+    translateStockLevel
   }
 }

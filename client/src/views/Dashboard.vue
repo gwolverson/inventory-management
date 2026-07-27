@@ -297,11 +297,13 @@
 </template>
 
 <script>
-import { ref, onMounted, computed, watch } from 'vue'
+import { ref, computed } from 'vue'
 import { api } from '../api'
 import { useFilters } from '../composables/useFilters'
 import { useI18n } from '../composables/useI18n'
+import { useResource } from '../composables/useResource'
 import { formatCurrency } from '../utils/currency'
+import { formatDate as formatDateUtil } from '../utils/date'
 import ProductDetailModal from '../components/ProductDetailModal.vue'
 import BacklogDetailModal from '../components/BacklogDetailModal.vue'
 
@@ -312,9 +314,7 @@ export default {
     BacklogDetailModal,
   },
   setup() {
-    const { t, currentCurrency, translateProductName, translateWarehouse } = useI18n()
-    const loading = ref(true)
-    const error = ref(null)
+    const { t, currentCurrency, currentLocale, translateProductName, translateWarehouse, translateCategory, translatePriority, translateStockLevel } = useI18n()
     const summary = ref({})
     const allOrders = ref([])
     const inventoryItems = ref([])
@@ -558,28 +558,19 @@ export default {
       return allBacklogItems.value.filter(b => validSkus.has(b.item_sku))
     })
 
-    const loadData = async () => {
-      try {
-        loading.value = true
-        const filters = getCurrentFilters()
-
-        const [summaryData, ordersData, inventoryData, backlogData] = await Promise.all([
-          api.getDashboardSummary(filters),
-          api.getOrders(filters),
-          api.getInventory(filters),
-          api.getBacklog()
-        ])
-
-        summary.value = summaryData
-        allOrders.value = ordersData
-        inventoryItems.value = inventoryData
-        allBacklogItems.value = backlogData
-      } catch (err) {
-        error.value = 'Failed to load dashboard data: ' + err.message
-      } finally {
-        loading.value = false
-      }
-    }
+    const { loading, error } = useResource(async () => {
+      const filters = getCurrentFilters()
+      const [summaryData, ordersData, inventoryData, backlogData] = await Promise.all([
+        api.getDashboardSummary(filters),
+        api.getOrders(filters),
+        api.getInventory(filters),
+        api.getBacklog()
+      ])
+      summary.value = summaryData
+      allOrders.value = ordersData
+      inventoryItems.value = inventoryData
+      allBacklogItems.value = backlogData
+    }, { watchSources: [selectedPeriod, selectedLocation, selectedCategory, selectedStatus], errorMessage: 'Failed to load dashboard data' })
 
     const calculatePercentage = (value, goal) => {
       return ((value / goal) * 100).toFixed(2)
@@ -601,44 +592,8 @@ export default {
       return 'danger'
     }
 
-    const translateCategory = (category) => {
-      const categoryMap = {
-        'Circuit Boards': t('categories.circuitBoards'),
-        'Sensors': t('categories.sensors'),
-        'Actuators': t('categories.actuators'),
-        'Controllers': t('categories.controllers'),
-        'Power Supplies': t('categories.powerSupplies')
-      }
-      return categoryMap[category] || category
-    }
-
-    const translateStockLevel = (stockLevel) => {
-      const stockMap = {
-        'In Stock': t('status.inStock'),
-        'Low Stock': t('status.lowStock')
-      }
-      return stockMap[stockLevel] || stockLevel
-    }
-
-    const translatePriority = (priority) => {
-      const priorityMap = {
-        'high': t('priority.high'),
-        'medium': t('priority.medium'),
-        'low': t('priority.low'),
-        'High': t('priority.high'),
-        'Medium': t('priority.medium'),
-        'Low': t('priority.low')
-      }
-      return priorityMap[priority] || priority
-    }
-
-    const formatDate = (dateString) => {
-      if (!dateString) return '-'
-      const { currentLocale } = useI18n()
-      const locale = currentLocale.value === 'ja' ? 'ja-JP' : 'en-US'
-      const date = new Date(dateString)
-      return date.toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' })
-    }
+    const formatDate = (dateString) =>
+      formatDateUtil(dateString, { locale: currentLocale.value === 'ja' ? 'ja-JP' : 'en-US' })
 
     const showProductDetail = (product) => {
       selectedProduct.value = product
@@ -671,13 +626,6 @@ export default {
       }
       showPOModal.value = false
     }
-
-    // Watch for filter changes and reload data
-    watch([selectedPeriod, selectedLocation, selectedCategory, selectedStatus], () => {
-      loadData()
-    })
-
-    onMounted(loadData)
 
     return {
       t,

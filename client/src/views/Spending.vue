@@ -172,11 +172,13 @@
 </template>
 
 <script>
-import { ref, onMounted, watch, computed } from 'vue'
+import { ref, computed } from 'vue'
 import { api } from '../api'
 import { useFilters } from '../composables/useFilters'
 import { useI18n } from '../composables/useI18n'
+import { useResource } from '../composables/useResource'
 import { formatCurrency as formatCurrencyUtil } from '../utils/currency'
+import { formatDate as formatDateUtil, formatDateShort as formatDateShortUtil } from '../utils/date'
 import CostDetailModal from '../components/CostDetailModal.vue'
 
 export default {
@@ -185,9 +187,7 @@ export default {
     CostDetailModal
   },
   setup() {
-    const { t, currentCurrency } = useI18n()
-    const loading = ref(true)
-    const error = ref(null)
+    const { t, currentCurrency, translateCategory, translateMonth } = useI18n()
     const allMonthlySpending = ref([])
     const allCategorySpending = ref([])
     const allTransactions = ref([])
@@ -347,33 +347,20 @@ export default {
       return Math.ceil(max / 1000) // Return in K
     })
 
-    const loadData = async () => {
-      try {
-        loading.value = true
-        const [summaryRes, monthlyRes, categoryRes, transactionsRes, ordersRes] = await Promise.all([
-          api.getSpendingSummary(),
-          api.getMonthlySpending(),
-          api.getCategorySpending(),
-          api.getTransactions(),
-          api.getOrders()
-        ])
-
-        summaryData.value = summaryRes
-        allMonthlySpending.value = monthlyRes
-        allCategorySpending.value = categoryRes
-        allTransactions.value = transactionsRes
-        allOrders.value = ordersRes
-      } catch (err) {
-        error.value = 'Failed to load financial data: ' + err.message
-      } finally {
-        loading.value = false
-      }
-    }
-
-    // Watch for period filter changes
-    watch([selectedPeriod], () => {
-      // Data will automatically update via computed properties
-    })
+    const { loading, error } = useResource(async () => {
+      const [summaryRes, monthlyRes, categoryRes, transactionsRes, ordersRes] = await Promise.all([
+        api.getSpendingSummary(),
+        api.getMonthlySpending(),
+        api.getCategorySpending(),
+        api.getTransactions(),
+        api.getOrders()
+      ])
+      summaryData.value = summaryRes
+      allMonthlySpending.value = monthlyRes
+      allCategorySpending.value = categoryRes
+      allTransactions.value = transactionsRes
+      allOrders.value = ordersRes
+    }, { errorMessage: 'Failed to load financial data' })
 
     const formatCurrency = (value) => {
       return formatCurrencyUtil(value, currentCurrency.value)
@@ -393,59 +380,10 @@ export default {
       return (value / maxValue) * 100
     }
 
-    const formatDate = (dateString) => {
-      return new Date(dateString).toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric'
-      })
-    }
+    const formatDate = (dateString) =>
+      formatDateUtil(dateString, { options: { month: 'short', day: 'numeric' } })
 
-    const formatDateShort = (dateString) => {
-      const date = new Date(dateString)
-      const month = (date.getMonth() + 1).toString().padStart(2, '0')
-      const day = date.getDate().toString().padStart(2, '0')
-      const year = date.getFullYear().toString().slice(-2)
-      return `${month}/${day}/${year}`
-    }
-
-    const translateMonth = (month) => {
-      const monthMap = {
-        'Jan': t('months.jan'),
-        'Feb': t('months.feb'),
-        'Mar': t('months.mar'),
-        'Apr': t('months.apr'),
-        'May': t('months.may'),
-        'Jun': t('months.jun'),
-        'Jul': t('months.jul'),
-        'Aug': t('months.aug'),
-        'Sep': t('months.sep'),
-        'Oct': t('months.oct'),
-        'Nov': t('months.nov'),
-        'Dec': t('months.dec')
-      }
-      return monthMap[month] || month
-    }
-
-    const translateCategory = (category) => {
-      // First try spending categories
-      const spendingCategoryMap = {
-        'Raw Materials': t('spendingCategories.rawMaterials'),
-        'Components': t('spendingCategories.components'),
-        'Equipment': t('spendingCategories.equipment'),
-        'Consumables': t('spendingCategories.consumables')
-      }
-
-      // Then try product categories
-      const productCategoryMap = {
-        'Circuit Boards': t('categories.circuitBoards'),
-        'Sensors': t('categories.sensors'),
-        'Actuators': t('categories.actuators'),
-        'Controllers': t('categories.controllers'),
-        'Power Supplies': t('categories.powerSupplies')
-      }
-
-      return spendingCategoryMap[category] || productCategoryMap[category] || category
-    }
+    const formatDateShort = (dateString) => formatDateShortUtil(dateString)
 
     const handleTransactionClick = (transaction) => {
       console.log('Transaction clicked:', transaction)
@@ -456,8 +394,6 @@ export default {
       selectedCostData.value = monthData
       showCostModal.value = true
     }
-
-    onMounted(loadData)
 
     return {
       t,

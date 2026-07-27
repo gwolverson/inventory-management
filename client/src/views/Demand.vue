@@ -111,17 +111,16 @@
 </template>
 
 <script>
-import { ref, onMounted, watch, computed } from 'vue'
+import { ref, computed } from 'vue'
 import { api } from '../api'
 import { useFilters } from '../composables/useFilters'
 import { useI18n } from '../composables/useI18n'
+import { useResource } from '../composables/useResource'
 
 export default {
   name: 'Demand',
   setup() {
-    const { t } = useI18n()
-    const loading = ref(true)
-    const error = ref(null)
+    const { t, currentLocale } = useI18n()
     const allForecasts = ref([])
     const inventoryItems = ref([])
 
@@ -139,32 +138,15 @@ export default {
       return allForecasts.value.filter(f => validSkus.has(f.item_sku))
     })
 
-    const loadForecasts = async () => {
-      try {
-        loading.value = true
-        const filters = getCurrentFilters()
-
-        const [forecastsData, inventoryData] = await Promise.all([
-          api.getDemandForecasts(),
-          api.getInventory({
-            warehouse: filters.warehouse,
-            category: filters.category
-          })
-        ])
-
-        allForecasts.value = forecastsData
-        inventoryItems.value = inventoryData
-      } catch (err) {
-        error.value = 'Failed to load demand forecasts: ' + err.message
-      } finally {
-        loading.value = false
-      }
-    }
-
-    // Watch for filter changes and reload data
-    watch([selectedLocation, selectedCategory], () => {
-      loadForecasts()
-    })
+    const { loading, error } = useResource(async () => {
+      const filters = getCurrentFilters()
+      const [forecastsData, inventoryData] = await Promise.all([
+        api.getDemandForecasts(),
+        api.getInventory({ warehouse: filters.warehouse, category: filters.category })
+      ])
+      allForecasts.value = forecastsData
+      inventoryItems.value = inventoryData
+    }, { watchSources: [selectedLocation, selectedCategory], errorMessage: 'Failed to load demand forecasts' })
 
     const getForecastsByTrend = (trend) => {
       return forecasts.value.filter(f => f.trend === trend)
@@ -191,7 +173,6 @@ export default {
 
     const translatePeriod = (period) => {
       // Period values like "Next 3 months", "Q1 2025", "30 days", etc.
-      const { currentLocale } = useI18n()
       if (currentLocale.value === 'ja') {
         return period
           .replace(/Next\s+/i, '次の')
@@ -206,8 +187,6 @@ export default {
       }
       return period
     }
-
-    onMounted(loadForecasts)
 
     return {
       t,
