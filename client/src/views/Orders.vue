@@ -54,7 +54,7 @@
                       {{ t('orders.itemsCount', { count: order.items.length }) }}
                     </summary>
                     <div class="items-dropdown">
-                      <div v-for="(item, idx) in order.items" :key="idx" class="item-entry">
+                      <div v-for="item in order.items" :key="item.sku" class="item-entry">
                         <span class="item-name">{{ translateProductName(item.name) }}</span>
                         <span class="item-meta">{{ t('orders.quantity') }}: {{ item.quantity }} @ {{ currencySymbol }}{{ item.unit_price }}</span>
                       </div>
@@ -100,7 +100,7 @@
                       {{ t('orders.itemsCount', { count: order.items.length }) }}
                     </summary>
                     <div class="items-dropdown">
-                      <div v-for="(item, idx) in order.items" :key="idx" class="item-entry">
+                      <div v-for="item in order.items" :key="item.sku" class="item-entry">
                         <span class="item-name">{{ translateProductName(item.name) }}</span>
                         <span class="item-meta">{{ t('orders.quantity') }}: {{ item.quantity }} @ {{ currencySymbol }}{{ item.unit_cost }}</span>
                       </div>
@@ -121,21 +121,21 @@
 </template>
 
 <script>
-import { ref, onMounted, watch, computed } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { api } from '../api'
 import { useFilters } from '../composables/useFilters'
 import { useI18n } from '../composables/useI18n'
+import { useResource } from '../composables/useResource'
+import { formatDate as formatDateUtil } from '../utils/date'
 
 export default {
   name: 'Orders',
   setup() {
-    const { t, currentCurrency, translateProductName, translateCustomerName } = useI18n()
+    const { t, currentCurrency, currentLocale, translateProductName, translateCustomerName } = useI18n()
 
     const currencySymbol = computed(() => {
       return currentCurrency.value === 'JPY' ? '¥' : '$'
     })
-    const loading = ref(true)
-    const error = ref(null)
     const orders = ref([])
     const restockOrders = ref([])
 
@@ -148,29 +148,15 @@ export default {
       getCurrentFilters
     } = useFilters()
 
-    const loadOrders = async () => {
-      try {
-        loading.value = true
-        const filters = getCurrentFilters()
-        const fetchedOrders = await api.getOrders(filters)
-
-        // Sort orders by order_date (earliest first)
-        orders.value = fetchedOrders.sort((a, b) => {
-          const dateA = new Date(a.order_date)
-          const dateB = new Date(b.order_date)
-          return dateA - dateB
-        })
-      } catch (err) {
-        error.value = 'Failed to load orders: ' + err.message
-      } finally {
-        loading.value = false
-      }
-    }
-
-    // Watch for filter changes and reload data
-    watch([selectedPeriod, selectedLocation, selectedCategory, selectedStatus], () => {
-      loadOrders()
-    })
+    const { loading, error } = useResource(async () => {
+      const filters = getCurrentFilters()
+      const fetchedOrders = await api.getOrders(filters)
+      orders.value = fetchedOrders.sort((a, b) => {
+        const dateA = new Date(a.order_date)
+        const dateB = new Date(b.order_date)
+        return dateA - dateB
+      })
+    }, { watchSources: [selectedPeriod, selectedLocation, selectedCategory, selectedStatus], errorMessage: 'Failed to load orders' })
 
     // Restock orders have no warehouse/category/status/month fields, so they are
     // intentionally excluded from the filter-driven reload above.
@@ -196,20 +182,10 @@ export default {
       return statusMap[status] || 'info'
     }
 
-    const formatDate = (dateString) => {
-      const { currentLocale } = useI18n()
-      const locale = currentLocale.value === 'ja' ? 'ja-JP' : 'en-US'
-      return new Date(dateString).toLocaleDateString(locale, {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric'
-      })
-    }
+    const formatDate = (dateString) =>
+      formatDateUtil(dateString, { locale: currentLocale.value === 'ja' ? 'ja-JP' : 'en-US' })
 
-    onMounted(() => {
-      loadOrders()
-      loadRestockOrders()
-    })
+    onMounted(loadRestockOrders)
 
     return {
       t,

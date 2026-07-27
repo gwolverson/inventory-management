@@ -87,6 +87,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useI18n } from '../composables/useI18n'
+import { formatDate as formatDateUtil } from '../utils/date'
 
 const { translateProductName } = useI18n()
 
@@ -112,15 +113,8 @@ const close = () => {
   emit('close')
 }
 
-const formatDate = (dateString) => {
-  if (!dateString) return 'N/A'
-  const date = new Date(dateString)
-  return date.toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
-  })
-}
+const formatDate = (dateString) =>
+  formatDateUtil(dateString, { options: { year: 'numeric', month: 'long', day: 'numeric' }, fallback: 'N/A' })
 </script>
 
 <style scoped>

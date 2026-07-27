@@ -84,10 +84,11 @@
 </template>
 
 <script>
-import { ref, onMounted, watch, computed } from 'vue'
+import { ref, computed } from 'vue'
 import { api } from '../api'
 import { useFilters } from '../composables/useFilters'
 import { useI18n } from '../composables/useI18n'
+import { useResource } from '../composables/useResource'
 import InventoryDetailModal from '../components/InventoryDetailModal.vue'
 
 export default {
@@ -96,14 +97,12 @@ export default {
     InventoryDetailModal
   },
   setup() {
-    const { t, currentCurrency, translateProductName, translateWarehouse } = useI18n()
+    const { t, currentCurrency, translateProductName, translateWarehouse, translateCategory } = useI18n()
 
     const currencySymbol = computed(() => {
       return currentCurrency.value === 'JPY' ? '¥' : '$'
     })
 
-    const loading = ref(true)
-    const error = ref(null)
     const items = ref([])
     const searchQuery = ref('')
 
@@ -149,26 +148,10 @@ export default {
       })
     })
 
-    const loadInventory = async () => {
-      try {
-        loading.value = true
-        const filters = getCurrentFilters()
-        // Inventory doesn't support month/status filters, only warehouse and category
-        items.value = await api.getInventory({
-          warehouse: filters.warehouse,
-          category: filters.category
-        })
-      } catch (err) {
-        error.value = 'Failed to load inventory: ' + err.message
-      } finally {
-        loading.value = false
-      }
-    }
-
-    // Watch for filter changes and reload data
-    watch([selectedLocation, selectedCategory], () => {
-      loadInventory()
-    })
+    const { loading, error } = useResource(async () => {
+      const filters = getCurrentFilters()
+      items.value = await api.getInventory({ warehouse: filters.warehouse, category: filters.category })
+    }, { watchSources: [selectedLocation, selectedCategory], errorMessage: 'Failed to load inventory' })
 
     const getStockStatus = (item) => {
       const key = getStockStatusKey(item)
@@ -185,23 +168,10 @@ export default {
       }
     }
 
-    const translateCategory = (category) => {
-      const categoryMap = {
-        'Circuit Boards': t('categories.circuitBoards'),
-        'Sensors': t('categories.sensors'),
-        'Actuators': t('categories.actuators'),
-        'Controllers': t('categories.controllers'),
-        'Power Supplies': t('categories.powerSupplies')
-      }
-      return categoryMap[category] || category
-    }
-
     const showItemDetail = (item) => {
       selectedItem.value = item
       showItemModal.value = true
     }
-
-    onMounted(loadInventory)
 
     return {
       t,

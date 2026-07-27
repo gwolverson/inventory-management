@@ -97,14 +97,15 @@
 </template>
 
 <script>
-import { ref, onMounted, computed } from 'vue'
+import { ref, computed } from 'vue'
 import { api } from '../api'
 import { useI18n } from '../composables/useI18n'
+import { useResource } from '../composables/useResource'
 
 export default {
   name: 'Restocking',
   setup() {
-    const { t, currentCurrency, translateProductName, translateWarehouse } = useI18n()
+    const { t, currentCurrency, translateProductName, translateWarehouse, translateCategory } = useI18n()
 
     const currencySymbol = computed(() => {
       return currentCurrency.value === 'JPY' ? '¥' : '$'
@@ -114,8 +115,6 @@ export default {
     const recommendations = ref([])
     const totalCost = ref(0)
     const remainingBudget = ref(0)
-    const loading = ref(true)
-    const error = ref(null)
     const submitting = ref(false)
     const successMessage = ref(null)
 
@@ -123,20 +122,12 @@ export default {
       return remainingBudget.value >= 0 ? '#10b981' : '#ef4444'
     })
 
-    const loadRecommendations = async () => {
-      try {
-        loading.value = true
-        error.value = null
-        const response = await api.getRestockRecommendations(budget.value)
-        recommendations.value = response.items
-        totalCost.value = response.total_cost
-        remainingBudget.value = response.remaining_budget
-      } catch (err) {
-        error.value = 'Failed to load restock recommendations: ' + err.message
-      } finally {
-        loading.value = false
-      }
-    }
+    const { loading, error, reload: loadRecommendations } = useResource(async () => {
+      const response = await api.getRestockRecommendations(budget.value)
+      recommendations.value = response.items
+      totalCost.value = response.total_cost
+      remainingBudget.value = response.remaining_budget
+    }, { errorMessage: 'Failed to load restock recommendations' })
 
     const placeOrder = async () => {
       try {
@@ -162,19 +153,6 @@ export default {
         submitting.value = false
       }
     }
-
-    const translateCategory = (category) => {
-      const categoryMap = {
-        'Circuit Boards': t('categories.circuitBoards'),
-        'Sensors': t('categories.sensors'),
-        'Actuators': t('categories.actuators'),
-        'Controllers': t('categories.controllers'),
-        'Power Supplies': t('categories.powerSupplies')
-      }
-      return categoryMap[category] || category
-    }
-
-    onMounted(loadRecommendations)
 
     return {
       t,

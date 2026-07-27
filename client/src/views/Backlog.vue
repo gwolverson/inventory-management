@@ -82,15 +82,14 @@
 </template>
 
 <script>
-import { ref, onMounted, watch, computed } from 'vue'
+import { ref, computed } from 'vue'
 import { api } from '../api'
 import { useFilters } from '../composables/useFilters'
+import { useResource } from '../composables/useResource'
 
 export default {
   name: 'Backlog',
   setup() {
-    const loading = ref(true)
-    const error = ref(null)
     const allBacklogItems = ref([])
     const inventoryItems = ref([])
 
@@ -108,38 +107,19 @@ export default {
       return allBacklogItems.value.filter(b => validSkus.has(b.item_sku))
     })
 
-    const loadBacklog = async () => {
-      try {
-        loading.value = true
-        const filters = getCurrentFilters()
-
-        const [backlogData, inventoryData] = await Promise.all([
-          api.getBacklog(),
-          api.getInventory({
-            warehouse: filters.warehouse,
-            category: filters.category
-          })
-        ])
-
-        allBacklogItems.value = backlogData
-        inventoryItems.value = inventoryData
-      } catch (err) {
-        error.value = 'Failed to load backlog: ' + err.message
-      } finally {
-        loading.value = false
-      }
-    }
+    const { loading, error } = useResource(async () => {
+      const filters = getCurrentFilters()
+      const [backlogData, inventoryData] = await Promise.all([
+        api.getBacklog(),
+        api.getInventory({ warehouse: filters.warehouse, category: filters.category })
+      ])
+      allBacklogItems.value = backlogData
+      inventoryItems.value = inventoryData
+    }, { watchSources: [selectedLocation, selectedCategory], errorMessage: 'Failed to load backlog' })
 
     const getBacklogByPriority = (priority) => {
       return backlogItems.value.filter(item => item.priority === priority)
     }
-
-    // Watch for filter changes and reload data
-    watch([selectedLocation, selectedCategory], () => {
-      loadBacklog()
-    })
-
-    onMounted(loadBacklog)
 
     return {
       loading,
